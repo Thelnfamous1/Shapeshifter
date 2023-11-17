@@ -65,7 +65,7 @@ public class Shapeshifter {
 
 
     private void onRightClickEntity(PlayerInteractEvent.EntityInteract event){
-        if(event.getItemStack().is(MORPH_REMOTE.get())){
+        if(event.getItemStack().is(MORPH_REMOTE.get()) && !event.getEntity().isSecondaryUseActive()){
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide));
             if(!event.getLevel().isClientSide){
@@ -85,7 +85,7 @@ public class Shapeshifter {
                 } else if(((EntityDisguise) player).isDisguised()){
                     Entity disguiseEntity = ((EntityDisguise) player).getDisguiseEntity();
                     if(disguiseEntity instanceof DummyBlockEntity dummyBlock){
-                        dummyBlock.cycleFacing();
+                        dummyBlock.cycleBlockState();
                     }
                 }
             }

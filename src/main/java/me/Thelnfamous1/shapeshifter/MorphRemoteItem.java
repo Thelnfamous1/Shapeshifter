@@ -26,6 +26,10 @@ public class MorphRemoteItem extends Item {
 
     @Override
     public InteractionResult useOn(UseOnContext pContext) {
+        if(pContext.getPlayer() != null && pContext.getPlayer().isSecondaryUseActive()){
+            return InteractionResult.PASS;
+        }
+
         Level level = pContext.getLevel();
         if(!level.isClientSide){
             Player player = pContext.getPlayer();
@@ -33,7 +37,7 @@ public class MorphRemoteItem extends Item {
                 BlockPos clickedPos = pContext.getClickedPos();
                 BlockState state = pContext.getLevel().getBlockState(clickedPos);
                 if(!state.isAir()){
-                    DummyBlockEntity dummyBlock = new DummyBlockEntity(level, clickedPos.getX(), clickedPos.getY(), clickedPos.getZ(), state.getBlock().defaultBlockState());
+                    DummyBlockEntity dummyBlock = new DummyBlockEntity(level, clickedPos.getX(), clickedPos.getY(), clickedPos.getZ(), state);
                     ((EntityDisguise)player).disguiseAs(dummyBlock);
                 }
             }

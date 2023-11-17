@@ -1,7 +1,6 @@
 package me.Thelnfamous1.shapeshifter;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.protocol.Packet;
@@ -16,11 +15,10 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.PacketDistributor;
 
-import java.util.List;
 import java.util.Optional;
 
 public class DummyBlockEntity extends Entity {
@@ -81,15 +79,15 @@ public class DummyBlockEntity extends Entity {
 
     @Override
     protected void readAdditionalSaveData(CompoundTag pCompound) {
-        pCompound.put("BlockState", NbtUtils.writeBlockState(this.getBlockState()));
-    }
-
-    @Override
-    protected void addAdditionalSaveData(CompoundTag pCompound) {
         this.setBlockState(NbtUtils.readBlockState(pCompound.getCompound("BlockState")));
         if (this.getBlockState().isAir()) {
             this.setBlockState(Blocks.SAND.defaultBlockState());
         }
+    }
+
+    @Override
+    protected void addAdditionalSaveData(CompoundTag pCompound) {
+        pCompound.put("BlockState", NbtUtils.writeBlockState(this.getBlockState()));
     }
 
     @Override
@@ -108,25 +106,23 @@ public class DummyBlockEntity extends Entity {
         this.setStartPos(this.blockPosition());
     }
 
-    public void cycleFacing() {
+    public void cycleBlockState() {
         if(this.getBlockState().hasProperty(BlockStateProperties.FACING)){
-            this.rotateBlockState(BlockStateProperties.FACING);
+            this.cycleProperty(BlockStateProperties.FACING);
         } else if(this.getBlockState().hasProperty(BlockStateProperties.FACING_HOPPER)){
-            this.rotateBlockState(BlockStateProperties.FACING_HOPPER);
+            this.cycleProperty(BlockStateProperties.FACING_HOPPER);
         } else if(this.getBlockState().hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
-            this.rotateBlockState(BlockStateProperties.HORIZONTAL_FACING);
+            this.cycleProperty(BlockStateProperties.HORIZONTAL_FACING);
+        } else if(this.getBlockState().hasProperty(BlockStateProperties.AXIS)){
+            this.cycleProperty(BlockStateProperties.AXIS);
+        } else if(this.getBlockState().hasProperty(BlockStateProperties.HORIZONTAL_AXIS)){
+            this.cycleProperty(BlockStateProperties.HORIZONTAL_AXIS);
         }
     }
 
-    private void rotateBlockState(DirectionProperty directionProperty){
-        Direction current = this.getBlockState().getValue(directionProperty);
-        List<Direction> possibleValues = directionProperty.getPossibleValues().stream().toList();
-        int index = possibleValues.indexOf(current);
-        if(index >= 0){
-            Direction next = possibleValues.get((index + 1) % possibleValues.size());
-            this.setBlockState(this.getBlockState().setValue(directionProperty, next));
-            this.sendUpdatePacket();
-        }
+    private <T extends Comparable<T>> void cycleProperty(Property<T> property){
+        this.setBlockState(this.getBlockState().cycle(property));
+        this.sendUpdatePacket();
     }
 
     private void sendUpdatePacket() {
