@@ -1,6 +1,8 @@
 package me.Thelnfamous1.shapeshifter;
 
 import com.mojang.logging.LogUtils;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
@@ -8,6 +10,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -19,6 +22,7 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
+import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -27,6 +31,7 @@ import org.slf4j.Logger;
 import xyz.nucleoid.disguiselib.api.EntityDisguise;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Mod(Shapeshifter.MODID)
 @Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -57,6 +62,7 @@ public class Shapeshifter {
 
     public Shapeshifter() {
         MinecraftForge.EVENT_BUS.addListener(this::onRightClickEntity);
+        MinecraftForge.EVENT_BUS.addListener(this::onRightClickBlock);
         MinecraftForge.EVENT_BUS.addListener(this::onRightClickItem);
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         ITEMS.register(modEventBus);
@@ -69,7 +75,32 @@ public class Shapeshifter {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide));
             if(!event.getLevel().isClientSide){
-                ((EntityDisguise)event.getEntity()).disguiseAs(event.getTarget().getType());
+                if(((EntityDisguise)event.getEntity()).getDisguiseEntity() == event.getEntity()) return;
+
+                CompoundTag saved = event.getTarget().saveWithoutId(new CompoundTag());
+                Entity copy = event.getTarget().getType().create(event.getLevel());
+                if(copy != null){
+                    UUID originalUUID = copy.getUUID();
+                    copy.load(saved);
+                    copy.setUUID(originalUUID);
+                    ((EntityDisguise)event.getEntity()).disguiseAs(copy);
+                }
+            }
+        }
+    }
+
+
+    private void onRightClickBlock(PlayerInteractEvent.RightClickBlock event){
+        if(event.getItemStack().is(MORPH_REMOTE.get()) && !event.getEntity().isSecondaryUseActive()){
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide));
+            if(!event.getLevel().isClientSide){
+                BlockPos clickedPos = event.getPos();
+                BlockState state = event.getLevel().getBlockState(clickedPos);
+                if(!state.isAir()){
+                    DummyBlockEntity dummyBlock = new DummyBlockEntity(event.getLevel(), clickedPos.getX(), clickedPos.getY(), clickedPos.getZ(), state);
+                    ((EntityDisguise)event.getEntity()).disguiseAs(dummyBlock);
+                }
             }
         }
     }
@@ -86,6 +117,7 @@ public class Shapeshifter {
                     Entity disguiseEntity = ((EntityDisguise) player).getDisguiseEntity();
                     if(disguiseEntity instanceof DummyBlockEntity dummyBlock){
                         dummyBlock.cycleBlockState();
+                        Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDummyBlock(dummyBlock, dummyBlock.getBlockState()));
                     }
                 }
             }

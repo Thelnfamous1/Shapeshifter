@@ -1,5 +1,6 @@
 {
   "item.shapeshifter.morph_remote": "Morph Remote",
   "item.shapeshifter.morph_remote.info": "Right-click on any block or entity to shapeshift into it!",
+  "item.shapeshifter.morph_remote.block": "Shift right-click as a block to cycle state",
   "entity.shapeshifter.dummy_block": "Dummy Block"
 }

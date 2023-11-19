@@ -23,6 +23,7 @@ public class DatagenHandler {
             protected void addTranslations() {
                 this.add(Shapeshifter.MORPH_REMOTE.get(), "Morph Remote");
                 this.add(MorphRemoteItem.INFO_KEY, "Right-click on any block or entity to shapeshift into it!");
+                this.add(MorphRemoteItem.BLOCK_KEY, "Shift right-click as a block to cycle state");
                 this.add(Shapeshifter.DUMMY_BLOCK.get(), "Dummy Block");
             }
         };

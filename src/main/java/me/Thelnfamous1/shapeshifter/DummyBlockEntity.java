@@ -1,5 +1,6 @@
 package me.Thelnfamous1.shapeshifter;
 
+import com.google.common.collect.ImmutableList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
@@ -14,10 +15,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.network.PacketDistributor;
 
 import java.util.Optional;
 
@@ -107,25 +105,9 @@ public class DummyBlockEntity extends Entity {
     }
 
     public void cycleBlockState() {
-        if(this.getBlockState().hasProperty(BlockStateProperties.FACING)){
-            this.cycleProperty(BlockStateProperties.FACING);
-        } else if(this.getBlockState().hasProperty(BlockStateProperties.FACING_HOPPER)){
-            this.cycleProperty(BlockStateProperties.FACING_HOPPER);
-        } else if(this.getBlockState().hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
-            this.cycleProperty(BlockStateProperties.HORIZONTAL_FACING);
-        } else if(this.getBlockState().hasProperty(BlockStateProperties.AXIS)){
-            this.cycleProperty(BlockStateProperties.AXIS);
-        } else if(this.getBlockState().hasProperty(BlockStateProperties.HORIZONTAL_AXIS)){
-            this.cycleProperty(BlockStateProperties.HORIZONTAL_AXIS);
-        }
-    }
-
-    private <T extends Comparable<T>> void cycleProperty(Property<T> property){
-        this.setBlockState(this.getBlockState().cycle(property));
-        this.sendUpdatePacket();
-    }
-
-    private void sendUpdatePacket() {
-        Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDummyBlock(this));
+        ImmutableList<BlockState> possibleStates = this.getBlockState().getBlock().getStateDefinition().getPossibleStates();
+        int currentIdx = possibleStates.indexOf(this.getBlockState());
+        BlockState next = possibleStates.get((currentIdx + 1) % possibleStates.size());
+        this.setBlockState(next);
     }
 }

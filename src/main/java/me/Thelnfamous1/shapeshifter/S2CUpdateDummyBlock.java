@@ -14,9 +14,9 @@ public class S2CUpdateDummyBlock {
     private final int id;
     private final BlockState blockState;
 
-    public S2CUpdateDummyBlock(DummyBlockEntity dummyBlock){
+    public S2CUpdateDummyBlock(DummyBlockEntity dummyBlock, BlockState newState){
         this.id = dummyBlock.getId();
-        this.blockState = dummyBlock.getBlockState();
+        this.blockState = newState;
     }
 
     public S2CUpdateDummyBlock(FriendlyByteBuf buf){
