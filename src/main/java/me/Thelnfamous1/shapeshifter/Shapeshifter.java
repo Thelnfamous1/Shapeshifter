@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -13,6 +14,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -64,6 +66,8 @@ public class Shapeshifter {
         MinecraftForge.EVENT_BUS.addListener(this::onRightClickEntity);
         MinecraftForge.EVENT_BUS.addListener(this::onRightClickBlock);
         MinecraftForge.EVENT_BUS.addListener(this::onRightClickItem);
+        MinecraftForge.EVENT_BUS.addListener(this::onPlayerLoggedIn);
+        MinecraftForge.EVENT_BUS.addListener(this::onStartTracking);
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         ITEMS.register(modEventBus);
         ENTITY_TYPES.register(modEventBus);
@@ -84,6 +88,7 @@ public class Shapeshifter {
                     copy.load(saved);
                     copy.setUUID(originalUUID);
                     ((EntityDisguise)event.getEntity()).disguiseAs(copy);
+                    Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDisguise(copy));
                 }
             }
         }
@@ -100,6 +105,7 @@ public class Shapeshifter {
                 if(!state.isAir()){
                     DummyBlockEntity dummyBlock = new DummyBlockEntity(event.getLevel(), clickedPos.getX(), clickedPos.getY(), clickedPos.getZ(), state);
                     ((EntityDisguise)event.getEntity()).disguiseAs(dummyBlock);
+                    Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDisguise(dummyBlock));
                 }
             }
         }
@@ -117,17 +123,36 @@ public class Shapeshifter {
                     Entity disguiseEntity = ((EntityDisguise) player).getDisguiseEntity();
                     if(disguiseEntity instanceof DummyBlockEntity dummyBlock){
                         dummyBlock.cycleBlockState();
-                        Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDummyBlock(dummyBlock, dummyBlock.getBlockState()));
+                        Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDisguise(dummyBlock));
                     }
                 }
             }
         }
     }
 
+    private void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event){
+        if(!event.getEntity().level.isClientSide){
+            updateDisguise((EntityDisguise) event.getEntity(), PacketDistributor.ALL.noArg());
+        }
+    }
+
+    public static void updateDisguise(EntityDisguise disguised, PacketDistributor.PacketTarget target) {
+        if(disguised.isDisguised()){
+            Entity disguiseEntity = disguised.getDisguiseEntity();
+            Shapeshifter.SYNC_CHANNEL.send(target, new S2CUpdateDisguise(disguiseEntity));
+        }
+    }
+
+    private void onStartTracking(PlayerEvent.StartTracking event){
+        if(!event.getTarget().level.isClientSide){
+            updateDisguise((EntityDisguise) event.getTarget(), PacketDistributor.PLAYER.with(() -> (ServerPlayer) event.getEntity()));
+        }
+    }
+
     @SubscribeEvent
     public static void onCommonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
-            SYNC_CHANNEL.registerMessage(0, S2CUpdateDummyBlock.class, S2CUpdateDummyBlock::encode, S2CUpdateDummyBlock::new, S2CUpdateDummyBlock::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+            SYNC_CHANNEL.registerMessage(0, S2CUpdateDisguise.class, S2CUpdateDisguise::encode, S2CUpdateDisguise::new, S2CUpdateDisguise::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         });
     }
 
