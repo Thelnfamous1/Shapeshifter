@@ -6,6 +6,8 @@
   "mixins": [
     "EntityAccessor"
   ],
-  "client": [],
+  "client": [
+    "ClientPacketListenerMixin"
+  ],
   "minVersion": "0.8.5"
 }
