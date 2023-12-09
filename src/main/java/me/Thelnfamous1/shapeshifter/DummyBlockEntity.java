@@ -85,7 +85,11 @@ public class DummyBlockEntity extends Entity {
 
     @Override
     protected void addAdditionalSaveData(CompoundTag pCompound) {
-        pCompound.put("BlockState", NbtUtils.writeBlockState(this.getBlockState()));
+        writeBlockState(pCompound, this.getBlockState());
+    }
+
+    public static void writeBlockState(CompoundTag pCompound, BlockState blockState) {
+        pCompound.put("BlockState", NbtUtils.writeBlockState(blockState));
     }
 
     @Override
@@ -105,9 +109,13 @@ public class DummyBlockEntity extends Entity {
     }
 
     public void cycleBlockState() {
-        ImmutableList<BlockState> possibleStates = this.getBlockState().getBlock().getStateDefinition().getPossibleStates();
-        int currentIdx = possibleStates.indexOf(this.getBlockState());
-        BlockState next = possibleStates.get((currentIdx + 1) % possibleStates.size());
+        BlockState next = getNextBlockState(this.getBlockState());
         this.setBlockState(next);
+    }
+
+    public static BlockState getNextBlockState(BlockState blockState) {
+        ImmutableList<BlockState> possibleStates = blockState.getBlock().getStateDefinition().getPossibleStates();
+        int currentIdx = possibleStates.indexOf(blockState);
+        return possibleStates.get((currentIdx + 1) % possibleStates.size());
     }
 }

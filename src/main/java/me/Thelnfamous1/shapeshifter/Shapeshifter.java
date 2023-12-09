@@ -1,6 +1,7 @@
 package me.Thelnfamous1.shapeshifter;
 
 import com.mojang.logging.LogUtils;
+import me.Thelnfamous1.shapeshifter.mixin.EntityAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -29,11 +30,11 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import xyz.nucleoid.disguiselib.api.EntityDisguise;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @Mod(Shapeshifter.MODID)
 @Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -62,6 +63,8 @@ public class Shapeshifter {
             PROTOCOL_VERSION::equals
     );
 
+    private static boolean UPDATE_DISGUISE = true;
+
     public Shapeshifter() {
         MinecraftForge.EVENT_BUS.addListener(this::onRightClickEntity);
         MinecraftForge.EVENT_BUS.addListener(this::onRightClickBlock);
@@ -79,18 +82,31 @@ public class Shapeshifter {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide));
             if(!event.getLevel().isClientSide){
-                if(((EntityDisguise)event.getEntity()).getDisguiseEntity() == event.getEntity()) return;
-
-                CompoundTag saved = event.getTarget().saveWithoutId(new CompoundTag());
-                Entity copy = event.getTarget().getType().create(event.getLevel());
-                if(copy != null){
-                    UUID originalUUID = copy.getUUID();
-                    copy.load(saved);
-                    copy.setUUID(originalUUID);
-                    ((EntityDisguise)event.getEntity()).disguiseAs(copy);
-                    Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDisguise(copy));
-                }
+                Player player = event.getEntity();
+                EntityDisguise disguisedPlayer = (EntityDisguise) player;
+                if(disguisedPlayer.getDisguiseEntity() == event.getTarget()) return;
+                disguisedPlayer.disguiseAs(event.getTarget().getType());
+                CompoundTag data = saveEntityData(event.getTarget());
+                ((EntityAccessor) disguisedPlayer.getDisguiseEntity()).shapeshifter_callReadAdditionalSaveData(data);
+                updateDisguise(disguisedPlayer, PacketDistributor.ALL.noArg(), data);
             }
+        }
+    }
+
+    private static CompoundTag saveEntityData(Entity entity) {
+        CompoundTag data = new CompoundTag();
+        ((EntityAccessor) entity).shapeshifter_callAddAdditionalSaveData(data);
+        return data;
+    }
+
+    public static void updateDisguise(EntityDisguise disguised, PacketDistributor.PacketTarget target){
+        updateDisguise(disguised, target, null);
+    }
+
+    public static void updateDisguise(EntityDisguise disguised, PacketDistributor.PacketTarget target, @Nullable CompoundTag data) {
+        if(UPDATE_DISGUISE && disguised.isDisguised()){
+            Entity disguiseEntity = disguised.getDisguiseEntity();
+            Shapeshifter.SYNC_CHANNEL.send(target, data == null ? new S2CUpdateDisguise(disguiseEntity) : new S2CUpdateDisguise(disguiseEntity, data));
         }
     }
 
@@ -103,12 +119,20 @@ public class Shapeshifter {
                 BlockPos clickedPos = event.getPos();
                 BlockState state = event.getLevel().getBlockState(clickedPos);
                 if(!state.isAir()){
+                    Player player = event.getEntity();
+                    EntityDisguise disguisedPlayer = (EntityDisguise) player;
                     DummyBlockEntity dummyBlock = new DummyBlockEntity(event.getLevel(), clickedPos.getX(), clickedPos.getY(), clickedPos.getZ(), state);
-                    ((EntityDisguise)event.getEntity()).disguiseAs(dummyBlock);
-                    Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDisguise(dummyBlock));
+                    disguisedPlayer.disguiseAs(dummyBlock);
+                    updateDisguise(disguisedPlayer, PacketDistributor.ALL.noArg());
                 }
             }
         }
+    }
+
+    private static CompoundTag saveBlockData(BlockState state) {
+        CompoundTag data = new CompoundTag();
+        DummyBlockEntity.writeBlockState(data, state);
+        return data;
     }
 
     private void onRightClickItem(PlayerInteractEvent.RightClickItem event){
@@ -117,13 +141,14 @@ public class Shapeshifter {
             event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide));
             if(!event.getLevel().isClientSide){
                 Player player = event.getEntity();
+                EntityDisguise disguisedPlayer = (EntityDisguise) player;
                 if(!player.isSecondaryUseActive()){
-                    ((EntityDisguise) player).removeDisguise();
-                } else if(((EntityDisguise) player).isDisguised()){
-                    Entity disguiseEntity = ((EntityDisguise) player).getDisguiseEntity();
+                    disguisedPlayer.removeDisguise();
+                } else if(disguisedPlayer.isDisguised()){
+                    Entity disguiseEntity = disguisedPlayer.getDisguiseEntity();
                     if(disguiseEntity instanceof DummyBlockEntity dummyBlock){
                         dummyBlock.cycleBlockState();
-                        Shapeshifter.SYNC_CHANNEL.send(PacketDistributor.ALL.noArg(), new S2CUpdateDisguise(dummyBlock));
+                        updateDisguise(disguisedPlayer, PacketDistributor.ALL.noArg());
                     }
                 }
             }
@@ -133,13 +158,6 @@ public class Shapeshifter {
     private void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event){
         if(!event.getEntity().level.isClientSide){
             updateDisguise((EntityDisguise) event.getEntity(), PacketDistributor.ALL.noArg());
-        }
-    }
-
-    public static void updateDisguise(EntityDisguise disguised, PacketDistributor.PacketTarget target) {
-        if(disguised.isDisguised()){
-            Entity disguiseEntity = disguised.getDisguiseEntity();
-            Shapeshifter.SYNC_CHANNEL.send(target, new S2CUpdateDisguise(disguiseEntity));
         }
     }
 

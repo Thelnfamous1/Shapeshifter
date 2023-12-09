@@ -17,10 +17,14 @@ public class S2CUpdateDisguise {
     private final EntityType<?> type;
     private final CompoundTag data;
 
-    public S2CUpdateDisguise(Entity disguisedEntity){
+    public S2CUpdateDisguise(Entity disguisedEntity, CompoundTag data){
         this.id = disguisedEntity.getId();
         this.type = disguisedEntity.getType();
-        this.data = new CompoundTag();
+        this.data = data;
+    }
+
+    public S2CUpdateDisguise(Entity disguisedEntity){
+        this(disguisedEntity, new CompoundTag());
         ((EntityAccessor)disguisedEntity).shapeshifter_callAddAdditionalSaveData(this.data);
     }
 
